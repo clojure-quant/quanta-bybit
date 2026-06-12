@@ -7,6 +7,11 @@
   (-> (crypto.mac/hash to-sign {:key key-secret :alg :hmac+sha256})
       (crypto.codecs/bytes->hex)))
 
+(defn hmac-sha256-hex
+  "HMAC-SHA256 hex digest for Bybit REST signing."
+  [payload key-secret]
+  (sign payload key-secret))
+
 (defn auth-msg
   "Build Bybit websocket auth message for `{:api-key ... :api-secret ...}`."
   [{:keys [api-key api-secret]}]

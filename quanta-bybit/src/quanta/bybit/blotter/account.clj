@@ -3,7 +3,7 @@
    [missionary.core :as m]
    [quanta.util.boot :refer [boot-with-retry]]
    [quanta.blotter.protocol :as p]
-   [quanta.blotter.interactor :refer [create-trade-interactor]]
+   [quanta.bybit.blotter.interactor :refer [create-bybit-trade-interactor]]
    [quanta.bybit.blotter.orderupdate-interactor :refer [create-orderupdate-interactor]]
    [quanta.bybit.blotter.private-messaging :refer [order-subscription]]
    [quanta.bybit.blotter.messaging]
@@ -44,12 +44,12 @@
         req-rdv (m/rdv)
         res-rdv (m/rdv)
         subscription-a (atom #{order-subscription})
+        account-log (account-log-fn id log)
         give-update (fn [update] (m/? (res-rdv update)))
-        trade-interactor (create-trade-interactor req-rdv res-rdv)
+        trade-interactor (create-bybit-trade-interactor req-rdv res-rdv account account-log)
         orderupdate-interactor (create-orderupdate-interactor subscription-a give-update)
         trade-account (with-connection-category account :trade)
-        private-account (with-connection-category account :private)
-        account-log (account-log-fn id log)]
+        private-account (with-connection-category account :private)]
     (m/sp
      (m/? (m/join vector
                   (boot-with-retry trade-account account-log trade-interactor)

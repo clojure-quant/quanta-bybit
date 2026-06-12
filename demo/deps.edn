@@ -6,4 +6,6 @@
   :quote-spot-future {:exec-fn quanta.bybit.demo.cli-quote-spot-future/start-cli
                       :exec-args {:mode :test}}
   :trade-blotter {:exec-fn quanta.bybit.demo.cli-trade-blotter/start-cli
-                   :exec-args {:mode :test}}}}
+                   :exec-args {:mode :test}}
+  :rest-print {:exec-fn quanta.bybit.demo.cli-rest-print/start-cli
+               :exec-args {:mode :test}}}}

@@ -11,11 +11,17 @@ Bybit WebSocket adapter for [quanta-blotter](https://github.com/clojure-quant/qu
 ## Asset Mapping
 Asset IDs: `BTCUSDT.S.BB` (spot), `BTCUSDT.LF.BB` (linear), etc.
 
+## Bybit Specific
+- quote endpoints are split into 4 segments (:spot :linear :inverse :option)
+- trade order/cancel routing uses RPC over websocket (req-ids)
+
 
 ## create a testnet account
 
-https://testnet.bybit.com/
-
+- https://testnet.bybit.com/
+- register
+- create api creds (read/write)
+- got to assets/dashboard - request demo funds.
 
 ## quotes test
 
@@ -39,3 +45,22 @@ cd demo && clojure -X:trade-blotter
 cd demo && clojure -X:trade-blotter :mode :main
 ```
 
+## REST print demo
+
+Calls `get-open-orders`, `get-positions`, and `get-wallet-balance` and prints
+the raw Bybit JSON responses (`retCode`, `retMsg`, `result`, …).
+
+```bash
+cd demo && clojure -X:rest-print
+cd demo && clojure -X:rest-print :mode :main
+```
+
+
+## future
+
+- more market data
+  - bars
+  - last-trade
+  - liquidations 
+  - stats
+  - orderbook (full orderbook)
