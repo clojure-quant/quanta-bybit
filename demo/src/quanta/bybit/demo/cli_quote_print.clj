@@ -28,7 +28,7 @@
   (let [l (create-logger "log/quotes.txt" false)
         log-fn (partial log l)
         am (create-account-manager log-fn)
-        _ (add-edn-accounts am "bybit-accounts-quote.edn")
+        _ (add-edn-accounts am "bybit-accounts-quote-test.edn")
         {:keys [flow subscription-a]} (get-account am 2002)
         _ (reset! subscription-a #{"BTCUSDT.S.BB" "ETHUSDT.S.BB"})
         printer (quote-printer flow)

@@ -2,4 +2,6 @@
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         io.github.clojure-quant/quanta-bybit {:local/root "../quanta-bybit"}}
  :aliases
- {:quote-print {:exec-fn quanta.bybit.demo.cli-quote-print/start-cli}}}
+ {:quote-print {:exec-fn quanta.bybit.demo.cli-quote-print/start-cli}
+  :quote-spot-future {:exec-fn quanta.bybit.demo.cli-quote-spot-future/start-cli
+                      :exec-args {:mode :test}}}}
