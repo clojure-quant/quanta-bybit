@@ -7,7 +7,7 @@
         tick/tick {:mvn/version "0.6.1"}
         metosin/jsonista {:mvn/version "0.3.13"}
         buddy/buddy-core {:mvn/version "1.11.423"}
-        io.github.clojure-quant/quanta-blotter {:mvn/version "0.1.42"}}
+        io.github.clojure-quant/quanta-blotter {:local/root "../../quanta-blotter/blotter"}}
 
  :aliases
  {:build {:deps {io.github.clojure/tools.build {:mvn/version "0.9.6"}

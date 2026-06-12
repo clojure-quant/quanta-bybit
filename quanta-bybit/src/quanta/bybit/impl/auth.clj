@@ -24,3 +24,15 @@
   [{:keys [op retCode success]}]
   (and (auth-response? {:op op})
        (or (= retCode 0) (true? success))))
+
+(defn auth-failed!
+  "Throw an exception that signals non-retryable auth failure."
+  [response]
+  (throw (ex-info "bybit auth failed"
+                  {:type ::auth-failed
+                   :response response})))
+
+(defn auth-failure?
+  "True for exceptions from [[auth-failed!]] or auth timeout."
+  [ex]
+  (= ::auth-failed (:type (ex-data ex))))

@@ -1,0 +1,7 @@
+[{:account/id 2000
+  :account/api :bybit-trade
+  :account/notes "bybit trade testnet spot)"
+  :account/settings {:connection {:mode :test}
+                     :login {:api-key "CtOKK6YezfVvOGmc0f"
+                             :api-secret "7HLHsB6f7XGbGPP42gunCVklQSIslaLgdur5"}}}]
+

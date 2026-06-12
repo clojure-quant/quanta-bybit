@@ -60,13 +60,13 @@
              (dbg "session: authenticated"))
 
          (auth/auth-response? msg)
-         (throw (ex-info "bybit auth failed" {:response msg}))
+         (auth/auth-failed! msg)
 
          (< n 100)
          (recur (inc n))
 
          :else
-         (throw (ex-info "bybit auth timeout" {})))))))
+         (throw (ex-info "bybit auth timeout" {:type ::auth-failed})))))))
 
 (defn create-bybit-session-task
   [account ws-socket log interactor]
@@ -105,10 +105,19 @@
                  (catch Cancelled _
                    :cancelled)
                  (catch Exception ex
-                   (dbg "session: exception" (ex-message ex) (ex-data ex))
-                   (log* {:type :connection-status
-                          :data {:error (ex-message ex) :data (ex-data ex)}})
-                   (throw ex))
+                   (if (auth/auth-failure? ex)
+                     (do
+                       (dbg "session: auth failed" (ex-message ex))
+                       (log* {:type :connection-status
+                              :data {:auth-failed true
+                                     :error (ex-message ex)
+                                     :response (:response (ex-data ex))}})
+                       :auth-failed)
+                     (do
+                       (dbg "session: exception" (ex-message ex) (ex-data ex))
+                       (log* {:type :connection-status
+                              :data {:error (ex-message ex) :data (ex-data ex)}})
+                       (throw ex))))
                  (finally
                    (log* {:type :connection-status :data :disconnected})
                    (when stream

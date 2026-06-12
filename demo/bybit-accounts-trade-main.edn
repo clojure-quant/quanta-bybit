@@ -1,0 +1,6 @@
+[{:account/id 2000
+  :account/api :bybit-trade
+  :account/notes "bybit trade mainnet spot"
+  :account/settings {:connection {:mode :main}
+                    :login {:api-key "YOUR_API_KEY"
+                            :api-secret "YOUR_API_SECRET"}}}]

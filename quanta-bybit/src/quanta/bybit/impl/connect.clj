@@ -23,9 +23,13 @@
                    :url (:url ws-socket)})
            {:keys [run]} (session/create-bybit-session-task account ws-socket log interactor)]
        (log {:type :bybit-session/starting :account/id (:account/id account)})
-       (m/? run)
-       (log {:type :bybit-session/stopped :account/id (:account/id account)})
-       :run-finally)
+       (let [result (m/? run)]
+         (log {:type :bybit-session/stopped
+               :account/id (:account/id account)
+               :result result})
+         (case result
+           :auth-failed :auth-failed
+           :run-finally)))
      (catch Exception e
        (dbg "connect-and-run: Exception" (ex-message e))
        (.printStackTrace e)
