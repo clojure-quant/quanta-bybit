@@ -1,0 +1,26 @@
+# Clojure / deps
+.cpcache/
+.lein-*
+.nrepl-port
+.nrepl-port.*
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/target/
+
+# tooling
+.clj-kondo/.cache/
+.lsp/
+.calva/
+.portal/
+
+# demo runtime
+demo/log/
+
+# editor / OS
+.idea/
+*.iml
+.vscode/
+*~
+.DS_Store

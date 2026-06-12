@@ -1,0 +1,11 @@
+[{:account/id 2002
+  :account/api :bybit-quote
+  :account/notes "bybit quotes spot"
+  :account/settings {:connection {:mode :test
+                                 :category :spot}}}
+
+ {:account/id 2003
+  :account/api :bybit-quote
+  :account/notes "bybit quotes linear"
+  :account/settings {:connection {:mode :test
+                                 :category :linear}}}]

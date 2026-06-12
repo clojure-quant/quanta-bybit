@@ -1,0 +1,5 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        io.github.clojure-quant/quanta-bybit {:local/root "../quanta-bybit"}}
+ :aliases
+ {:quote-print {:exec-fn quanta.bybit.demo.cli-quote-print/start-cli}}}
