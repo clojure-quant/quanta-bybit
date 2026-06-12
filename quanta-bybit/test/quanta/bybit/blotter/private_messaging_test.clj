@@ -1,5 +1,5 @@
 (ns quanta.bybit.blotter.private-messaging-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [quanta.bybit.blotter.private-messaging :as pm]))
 
 (def account-id 2000)
@@ -78,5 +78,40 @@
                      :qty "0.001"
                      :price "50000"
                      :updatedTime "1722551860334"}]}
+        update (pm/read-order-update account-id msg)]
+    (is (= :broker/order-canceled (:type update)))))
+
+(deftest read-order-update-new-empty-avg-price-test
+  (testing "Bybit sends avgPrice \"\" on New — must not throw"
+    (let [msg {:topic "order"
+               :data [{:orderLinkId "bybit-demo-2"
+                       :orderStatus "New"
+                       :symbol "BTCUSDT"
+                       :category "spot"
+                       :side "Buy"
+                       :orderType "Limit"
+                       :qty "0.001000"
+                       :price "59647.0"
+                       :cumExecQty "0"
+                       :avgPrice ""
+                       :updatedTime "1781293169044"}]}
+          update (pm/read-order-update account-id msg)]
+      (is (= :broker/order-confirmed (:type update)))
+      (is (= 59647.0M (:limit update))))))
+
+(deftest read-order-update-cancelled-empty-avg-price-test
+  (let [msg {:topic "order"
+             :data [{:orderLinkId "bybit-demo-2"
+                     :orderStatus "Cancelled"
+                     :symbol "BTCUSDT"
+                     :category "spot"
+                     :side "Buy"
+                     :orderType "Limit"
+                     :qty "0.001000"
+                     :price "59647.0"
+                     :cumExecQty "0"
+                     :avgPrice ""
+                     :rejectReason "EC_PerCancelRequest"
+                     :updatedTime "1781293214026"}]}
         update (pm/read-order-update account-id msg)]
     (is (= :broker/order-canceled (:type update)))))

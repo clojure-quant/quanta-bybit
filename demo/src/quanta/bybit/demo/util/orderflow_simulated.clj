@@ -5,7 +5,7 @@
   (create-time-flow
    [5 {:type :trader/new-order
        :account/id 2000
-       :order-id "bybit-demo-2"
+       :order-id "bybit-demo-4"
        :asset "BTCUSDT.S.BB"
        :side :buy
        :order-type :limit
@@ -13,12 +13,12 @@
        :qty 0.001M}
     15 {:type :trader/new-order
        :account/id 2000
-       :order-id "bybit-demo-3"
+       :order-id "bybit-demo-5"
        :asset "BTCUSDT.S.BB"
        :side :sell
        :order-type :market
        :qty 0.001M}
     30 {:type :trader/cancel-order
         :account/id 2000
-        :order-id "bybit-demo-2"
+        :order-id "bybit-demo-4"
         :asset "BTCUSDT.S.BB"}]))

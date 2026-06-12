@@ -15,6 +15,7 @@
 (defn- ->decimal [x]
   (cond
     (nil? x) nil
+    (and (string? x) (str/blank? x)) nil
     (instance? BigDecimal x) x
     (number? x) (bigdec x)
     (string? x) (bigdec x)
@@ -82,7 +83,7 @@
         qty-dec (->decimal qty)
         limit-dec (->decimal price)
         fill-qty (->decimal cumExecQty)
-        fill-price (->decimal (or avgPrice price))
+        fill-price (or (->decimal avgPrice) limit-dec)
         date (->instant updatedTime)]
     (when (and order-id asset side-kw order-type)
       (case orderStatus
@@ -112,14 +113,18 @@
         nil))))
 
 (defn read-order-update [account-id msg-in]
-  (cond
-    (and (= (:topic msg-in) order-topic) (seq (:data msg-in)))
-    (some #(bybit-order->blotter account-id %) (:data msg-in))
+  (let [msg (if (and (nil? (:topic msg-in))
+                      (= order-topic (get-in msg-in [:data :topic])))
+              (:data msg-in)
+              msg-in)]
+    (cond
+      (and (= (:topic msg) order-topic) (seq (:data msg)))
+      (some #(bybit-order->blotter account-id %) (:data msg))
 
-    (and (= (:op msg-in) "subscribe") (false? (:success msg-in)))
-    nil
+      (and (= (:op msg) "subscribe") (false? (:success msg)))
+      nil
 
-    :else nil))
+      :else nil)))
 
 (defn create-private-messaging [account log]
   {:account account
