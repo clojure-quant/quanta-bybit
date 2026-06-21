@@ -1,4 +1,4 @@
-# quanta-bybit
+# quanta-bybit [![GitHub Actions status |clojure-quant/quanta-bybit](https://github.com/clojure-quant/quanta-bybit/workflows/CI/badge.svg)](https://github.com/clojure-quant/quanta-bybit/actions?workflow=CI)[![Clojars Project](https://img.shields.io/clojars/v/io.github.clojure-quant/quanta-bybit.svg)](https://clojars.org/io.github.clojure-quant/quanta-bybit)
 
 Bybit WebSocket adapter for [quanta-blotter](https://github.com/clojure-quant/quanta-blotter).
 
