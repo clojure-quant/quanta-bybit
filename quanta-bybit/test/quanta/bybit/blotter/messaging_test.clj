@@ -35,7 +35,37 @@
                :asset "BTCUSDT.S.BB"}
         msg (p/api-order m order)]
     (is (= "order.cancel" (:op msg)))
+    (is (= "spot" (get-in msg [:args 0 "category"])))
+    (is (= "BTCUSDT" (get-in msg [:args 0 "symbol"])))
     (is (string? (:reqId msg)))))
+
+(deftest api-order-modify-test
+  (let [m (messaging)
+        order {:type :trader/modify-order
+               :account/id 2000
+               :order-id "test-order-1"
+               :asset "BTCUSDT.S.BB"
+               :qty 0.002M
+               :limit 51000M}
+        msg (p/api-order m order)]
+    (is (= "order.amend" (:op msg)))
+    (is (= "spot" (get-in msg [:args 0 "category"])))
+    (is (= "BTCUSDT" (get-in msg [:args 0 "symbol"])))
+    (is (= "test-order-1" (get-in msg [:args 0 "orderLinkId"])))
+    (is (= "0.002" (get-in msg [:args 0 "qty"])))
+    (is (= "51000" (get-in msg [:args 0 "price"])))))
+
+(deftest api-order-modify-qty-only-test
+  (let [m (messaging)
+        order {:type :trader/modify-order
+               :account/id 2000
+               :order-id "test-order-1"
+               :asset "BTCUSDT.LF.BB"
+               :qty 0.5M}
+        msg (p/api-order m order)]
+    (is (= "linear" (get-in msg [:args 0 "category"])))
+    (is (= "0.5" (get-in msg [:args 0 "qty"])))
+    (is (nil? (get-in msg [:args 0 "price"])))))
 
 (deftest rpc-reject-test
   (testing "immediate reject from trade websocket RPC reply"
@@ -80,6 +110,39 @@
         update (p/blotter-order-update m reply)]
     (is (= :broker/cancel-rejected (:type update))
         "cancel RPC failure")))
+
+(deftest rpc-modify-reject-test
+  (let [m (messaging)
+        modify {:type :trader/modify-order
+                :account/id 2000
+                :order-id "test-order-1"
+                :asset "BTCUSDT.S.BB"
+                :limit 51000M}
+        msg (p/api-order m modify)
+        reply {:op "order.amend"
+               :reqId (:reqId msg)
+               :retCode 110001
+               :retMsg "order not exists or too late to replace"}
+        update (p/blotter-order-update m reply)]
+    (is (= :broker/modify-rejected (:type update))
+        "modify RPC failure")))
+
+(deftest rpc-modify-accept-test
+  (testing "amend RPC ack is async; no broker message on success"
+    (let [m (messaging)
+          modify {:type :trader/modify-order
+                  :account/id 2000
+                  :order-id "test-order-1"
+                  :asset "BTCUSDT.S.BB"
+                  :qty 0.002M}
+          msg (p/api-order m modify)
+          reply {:op "order.amend"
+                 :reqId (:reqId msg)
+                 :retCode 0
+                 :retMsg "OK"
+                 :data {:orderLinkId "test-order-1"}}
+          update (p/blotter-order-update m reply)]
+      (is (nil? update)))))
 
 (deftest rpc-reject-without-reqid-test
   (testing "fallback when reply omits reqId but only one order is pending"

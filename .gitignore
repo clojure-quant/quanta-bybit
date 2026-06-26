@@ -25,3 +25,4 @@ demo/log/
 *~
 .DS_Store
 quanta-bybit/target/
+demo/trade-db-oms-server/

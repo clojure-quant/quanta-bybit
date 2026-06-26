@@ -40,10 +40,22 @@
              "symbol" symbol
              "orderLinkId" (str order-id)}]}))
 
+(defn- modify-order-msg [{:keys [order-id asset qty limit]}]
+  (let [{:keys [symbol category]} (u/asset-category asset)
+        bybit-order (cond-> {"category" category
+                             "symbol" symbol
+                             "orderLinkId" (str order-id)}
+                      qty (assoc "qty" (u/format-qty asset qty))
+                      limit (assoc "price" (u/format-price asset limit)))]
+    {:op "order.amend"
+     :header (u/api-header)
+     :args [bybit-order]}))
+
 (defn- blotter-order->api [order]
   (case (:type order)
     :trader/new-order (new-order-msg order)
     :trader/cancel-order (cancel-order-msg order)
+    :trader/modify-order (modify-order-msg order)
     (throw (ex-info "unsupported blotter order type"
                     {:type (:type order) :account/id (:account/id order)}))))
 
@@ -88,8 +100,33 @@
        :order-id order-id
        :message (rpc-error-msg msg)})))
 
+(defn- modify-response->blotter [account-id {:keys [order]} msg]
+  (let [order-modification (select-keys order [:order-id :asset :limit :qty])
+        order-base (assoc order-modification  :account/id account-id)]
+    (println "modify original order: " order)
+    (println "modify-response->blotter" msg)
+    ; original order: 
+    ;{:type :trader/modify-order, :account/id 2000, :order-id zT-6joLt, :asset BTCUSDT.S.BB, :limit 58901.0M}
+    
+    ; success
+    #_{:retCode 0, :retExtInfo {}, :retMsg "OK", :connId d8jr12h6ri7qsd2vfnl0-5pn7, :op 
+       "order.amend", :header {:Timenow 1782508563656, :X-Bapi-Limit-Status 9, :X-Bapi-Limit-Reset-Timestamp 1782508563656, 
+                               :Traceid "edf7a9735d1a46ecb45d8a1a6b2dbcf2", :X-Bapi-Limit 10}, :reqId "N9d1p9PX", 
+       :data {:orderLinkId "6bGcq_2z", :orderId "2246239057174947840"}}
+
+    ; reject
+    #_{:retCode 170213 :retExtInfo {} :retMsg "Order does not exist." :connId "d8jr12h6ri7qsd2vfnl0-5piv" 
+       :op "order.amend" :header {:Timenow 1782507679490 :X-Bapi-Limit-Status 9 :X-Bapi-Limit-Reset-Timestamp 1782507679488
+                                  :Traceid "bc6809c494414155a7a20e6df337acb7" :X-Bapi-Limit 10},
+       :reqId "CpQjrzHq" :data {}}
+
+    ;{"category" "spot", "symbol" "BTCUSDT", "orderLinkId" "bybit-demo-4", "price" "59646"}
+    (if (rpc-success? msg)
+      (assoc order-base :type :broker/order-modified :message "modify accepted")
+      (assoc order-base :type :broker/modify-rejected :message (rpc-error-msg msg)))))
+
 (defn- rpc-response? [{:keys [op]}]
-  (#{"order.create" "order.cancel"} op))
+  (#{"order.create" "order.cancel" "order.amend"} op))
 
 (defn- resolve-pending [pending-rpc msg-in]
   (if-let [id (req-id msg-in)]
@@ -116,6 +153,7 @@
         (case (:type (:order pending))
           :trader/new-order (create-response->blotter (:account/id account) pending msg-in)
           :trader/cancel-order (cancel-response->blotter (:account/id account) pending msg-in)
+          :trader/modify-order (modify-response->blotter (:account/id account) pending msg-in)
           nil)))))
 
 (defmethod p/create-trade-messaging :bybit-trade
