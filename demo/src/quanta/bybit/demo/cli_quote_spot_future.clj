@@ -3,7 +3,7 @@
    [clojure.string :as str]
    [missionary.core :as m]
    [quanta.quote.account-manager :refer [create-account-manager add-edn-accounts get-account]]
-   [quanta.blotter.logger :refer [create-logger log]]
+   [quanta.missionary.logger :refer [create-logger log]]
    [quanta.bybit.quote.account]))
 
 (def ^:private pairs
