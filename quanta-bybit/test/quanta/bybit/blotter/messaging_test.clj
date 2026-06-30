@@ -128,7 +128,7 @@
         "modify RPC failure")))
 
 (deftest rpc-modify-accept-test
-  (testing "amend RPC ack is async; no broker message on success"
+  (testing "amend RPC success emits broker/order-modified"
     (let [m (messaging)
           modify {:type :trader/modify-order
                   :account/id 2000
@@ -142,7 +142,13 @@
                  :retMsg "OK"
                  :data {:orderLinkId "test-order-1"}}
           update (p/blotter-order-update m reply)]
-      (is (nil? update)))))
+      (is (= :broker/order-modified (:type update)))
+      (is (= "test-order-1" (:order-id update)))
+      (is (= "BTCUSDT.S.BB" (:asset update)))
+      (is (= 0.002M (:qty update)))
+      (is (= "modify accepted" (:message update)))
+      (is (nil? (p/blotter-order-update m reply))
+          "pending entry removed after first match"))))
 
 (deftest rpc-reject-without-reqid-test
   (testing "fallback when reply omits reqId but only one order is pending"
