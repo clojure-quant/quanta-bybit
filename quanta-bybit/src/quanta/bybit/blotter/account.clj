@@ -38,7 +38,7 @@
   (assoc-in account [:account/settings :connection :category] category))
 
 (defmethod p/create-trade-account :bybit-trade
-  [account order-rdv update-rdv log]
+  [_ctx account order-rdv update-rdv log]
   (let [account (assoc account :account/session :bybit)
         {:keys [account/id]} account
         req-rdv (m/rdv)
