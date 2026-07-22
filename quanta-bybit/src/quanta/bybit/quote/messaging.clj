@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as str]
    [tick.core :as t]
+   [nano-id.core :refer [nano-id]]
    [quanta.quote.protocol :as p]
    [quanta.asset.mapper :as am]
    [quanta.bybit.impl.asset-converter :as ac]))
@@ -51,12 +52,12 @@
                     :category category
                     :assets invalid}))
           topics (subscribe-topics asset-converter valid)
-          msg {:op "subscribe" :args topics}]
+          msg {:op "subscribe" :args topics  :req_id (nano-id 8) }] ; request id is useful for latency tracking
       (log {:type :subscribe :assets valid :broker-topics topics})
       msg))
   (unsubscribe-msg [_ unsub]
     (let [topics (subscribe-topics asset-converter unsub)
-          msg {:op "unsubscribe" :args topics}]
+          msg {:op "unsubscribe" :args topics :req_id (nano-id 8)}]
       (log {:type :unsubscribe :assets unsub :broker-topics topics})
       msg))
   (read-quote [_ msg-in]
