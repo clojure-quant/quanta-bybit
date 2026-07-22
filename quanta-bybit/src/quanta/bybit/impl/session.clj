@@ -1,11 +1,12 @@
 (ns quanta.bybit.impl.session
   (:require
    [missionary.core :as m]
+   [manifold.stream :as s]
    [nano-id.core :refer [nano-id]]
+   [tick.core :as t]
    [quanta.asset.mapper :refer [create-asset-mapper]]
    [quanta.bybit.impl.auth :as auth]
-   [quanta.bybit.impl.websocket :as ws]
-   [manifold.stream :as s])
+   [quanta.bybit.impl.websocket :as ws])
   (:import missionary.Cancelled))
 
 (defn- dbg [& args]
@@ -36,7 +37,7 @@
    (try
      (loop []
        (when-let [msg (m/? (ws-pull))]
-         (log {:type :json-msg :direction :in :data msg})
+         (log (assoc msg :type :json/in :date (t/instant)))
          (keepalive nil)
          (in-mbx msg)
          (recur)))
@@ -56,7 +57,8 @@
        (dbg "session: waiting for auth, got" (:op msg) "n=" n)
        (cond
          (auth/auth-success? msg)
-         (do (log {:type :connection-status :data :authenticated})
+         (do (log {:date (t/instant) :type :connection-status 
+                   :data :authenticated})
              (dbg "session: authenticated"))
 
          (auth/auth-response? msg)
@@ -72,14 +74,14 @@
   [account ws-socket log interactor]
   (let [connection-id (nano-id 16)
         log* (fn [event]
-               (log (assoc event :connection-id connection-id)))
+               (log (assoc event :connection-id connection-id :date (t/instant))))
         ws-push (:push ws-socket)
         ws-pull (:pull ws-socket)
         stream (:stream ws-socket)
         in-mbx (m/mbx)
         push (fn [msg]
                (m/sp
-                (log* {:type :json-msg :direction :out :data msg})
+                (log* (assoc msg :type :json/out))
                 (m/? (ws-push msg))))
         pull (fn []
                (m/sp

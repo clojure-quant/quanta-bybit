@@ -1,6 +1,7 @@
 (ns quanta.bybit.quote.messaging
   (:require
    [clojure.string :as str]
+   [tick.core :as t]
    [quanta.quote.protocol :as p]
    [quanta.asset.mapper :as am]
    [quanta.bybit.impl.asset-converter :as ac]))
@@ -45,7 +46,8 @@
           valid (filter #(ac/category-matches-asset? category %) sub)
           invalid (remove #(ac/category-matches-asset? category %) sub)
           _ (when (seq invalid)
-              (log {:type :subscribe-category-mismatch
+              (log {:date (t/instant)
+                    :type :subscribe-category-mismatch
                     :category category
                     :assets invalid}))
           topics (subscribe-topics asset-converter valid)
@@ -63,12 +65,39 @@
            (:topic msg-in))
       (snapshot->quote asset-converter msg-in)
 
-      (and (= (:op msg-in) "subscribe")
-           (false? (:success msg-in)))
-      (do (log {:type :subscription-failure :direction :in :data msg-in})
-          nil)
+      (= (:op msg-in) "subscribe")
+      (do
+        (if (:success msg-in)
+          (log (assoc msg-in :type :subscribe/success
+                      :date (t/instant)))
+          (log (assoc msg-in :type :subscribe/failure
+                      :date (t/instant))))
+        nil)
+      
+      (= (:op msg-in) "unsubscribe")
+      (do
+        (if (:success msg-in)
+          (log (assoc msg-in :type :unsubscribe/success
+                      :date (t/instant)))
+          (log (assoc msg-in :type :unsubscribe/failure
+                      :date (t/instant))))
+        nil)
+      
+      (= (:op msg-in) "ping")
+      (do
+        (if (:success msg-in)
+          (log (assoc msg-in :type :ping/success
+                      :date (t/instant)))
+          (log (assoc msg-in :type :ping/failure
+                      :date (t/instant))))
+        nil)
+     
 
-      :else nil)))
+      :else
+      (do
+        (log (assoc msg-in :type :unknown-msg-type
+                    :date (t/instant)))
+        nil))))
 
 (defmethod p/create-quote-messaging :bybit-quote
   [account-config asset-converter log]
