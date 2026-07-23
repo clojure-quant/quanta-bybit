@@ -3,20 +3,34 @@
    [quanta.bybit.impl.asset-converter :as ac])
   (:import [java.math BigDecimal]))
 
-(def ^:private category->suffix
+(def ^:private category->suffix-main
   {"spot" ".S.BB"
    "linear" ".LF.BB"
    "inverse" ".IF.BB"
    "option" ".O.BB"})
 
+(def ^:private category->suffix-test
+  {"spot" ".S.BBT"
+   "linear" ".LF.BBT"
+   "inverse" ".IF.BBT"
+   "option" ".O.BBT"})
+
 (defn category-name [category]
   (name (or category :spot)))
 
-(defn asset-from-bybit [symbol category-kw]
-  (when symbol
-    (let [suffix (get category->suffix (category-name category-kw))]
-      (when suffix
-        (str symbol suffix)))))
+(defn asset-from-bybit
+  "Build blotter asset id from Bybit symbol + category.
+   Optional `endpoint` is `:main` (default) or `:test` (.BBT)."
+  ([symbol category-kw]
+   (asset-from-bybit symbol category-kw :main))
+  ([symbol category-kw endpoint]
+   (when symbol
+     (let [suffixes (if (= endpoint :test)
+                      category->suffix-test
+                      category->suffix-main)
+           suffix (get suffixes (category-name category-kw))]
+       (when suffix
+         (str symbol suffix))))))
 
 (defn asset-category [asset-id]
   (when-let [{:keys [symbol category]} (ac/parse-asset-id asset-id)]
