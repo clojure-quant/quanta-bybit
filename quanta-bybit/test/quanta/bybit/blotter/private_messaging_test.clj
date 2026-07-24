@@ -4,6 +4,14 @@
 
 (def account-id 2000)
 
+(def main-account
+  {:account/id account-id
+   :account/settings {:connection {:mode :main}}})
+
+(def test-account
+  {:account/id account-id
+   :account/settings {:connection {:mode :test}}})
+
 (def new-order-msg
   {:topic "order"
    :data [{:orderLinkId "test-order-1"
@@ -39,14 +47,21 @@
   (is (nil? (pm/subscribe-msg nil #{"BTCUSDT.S.BB"}))))
 
 (deftest read-order-update-confirmed-test
-  (let [update (pm/read-order-update account-id new-order-msg)]
+  (let [update (pm/read-order-update main-account new-order-msg)]
     (is (= :broker/order-confirmed (:type update)))
     (is (= "test-order-1" (:order-id update)))
     (is (= account-id (:account/id update)))
     (is (= "BTCUSDT.S.BB" (:asset update)))))
 
+(deftest read-order-update-confirmed-testnet-test
+  (let [msg (assoc-in new-order-msg [:data 0 :category] "linear")
+        update (pm/read-order-update test-account msg)]
+    (is (= :broker/order-confirmed (:type update)))
+    (is (= "BTCUSDT.LF.BBT" (:asset update))
+        "test connection mode must map private updates to .BBT")))
+
 (deftest read-order-update-filled-test
-  (let [update (pm/read-order-update account-id filled-order-msg)]
+  (let [update (pm/read-order-update main-account filled-order-msg)]
     (is (= :broker/order-filled (:type update)))
     (is (= "test-order-1" (:order-id update))
         "matched by client order id (orderLinkId)")))
@@ -63,7 +78,7 @@
                      :qty "0.001"
                      :price "50000"
                      :updatedTime "1722551860334"}]}
-        update (pm/read-order-update account-id msg)]
+        update (pm/read-order-update main-account msg)]
     (is (= :broker/order-rejected (:type update)))
     (is (= "bad-order" (:order-id update)))))
 
@@ -78,7 +93,7 @@
                      :qty "0.001"
                      :price "50000"
                      :updatedTime "1722551860334"}]}
-        update (pm/read-order-update account-id msg)]
+        update (pm/read-order-update main-account msg)]
     (is (= :broker/order-canceled (:type update)))))
 
 (deftest read-order-update-new-empty-avg-price-test
@@ -95,7 +110,7 @@
                        :cumExecQty "0"
                        :avgPrice ""
                        :updatedTime "1781293169044"}]}
-          update (pm/read-order-update account-id msg)]
+          update (pm/read-order-update main-account msg)]
       (is (= :broker/order-confirmed (:type update)))
       (is (= 59647.0M (:limit update))))))
 
@@ -113,5 +128,5 @@
                      :avgPrice ""
                      :rejectReason "EC_PerCancelRequest"
                      :updatedTime "1781293214026"}]}
-        update (pm/read-order-update account-id msg)]
+        update (pm/read-order-update main-account msg)]
     (is (= :broker/order-canceled (:type update)))))

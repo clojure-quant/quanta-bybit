@@ -47,3 +47,20 @@
   (is (ac/category-matches-asset? :spot "BTCUSDT.S.BBT"))
   (is (not (ac/category-matches-asset? :spot "BTCUSDT.LF.BB")))
   (is (not (ac/category-matches-asset? :spot "BTCUSDT.LF.BBT"))))
+
+(deftest from-api-with-category-uses-connection-mode-test
+  (let [main-acct {:account/settings {:connection {:mode :main}}}
+        test-acct {:account/settings {:connection {:mode :test}}}]
+    (is (= "BTCUSDT.LF.BB" (ac/from-api-with-category main-acct "BTCUSDT" :linear)))
+    (is (= "BTCUSDT.LF.BBT" (ac/from-api-with-category test-acct "BTCUSDT" :linear)))
+    (is (= "BTCUSDT.S.BBT" (ac/from-api-with-category test-acct "BTCUSDT" "spot")))))
+
+(deftest to-api-logs-endpoint-mismatch-test
+  (let [events (atom [])
+        mapper (p/create-asset-mapper
+                (assoc linear-test-account :account/session :bybit)
+                (fn [e] (swap! events conj e)))]
+    (is (= "BTCUSDT" (p/to-api mapper "BTCUSDT.LF.BB")))
+    (is (= :asset-endpoint-mismatch (:type (first @events))))
+    (is (= :main (:endpoint (first @events))))
+    (is (= :test (:mode (first @events))))))

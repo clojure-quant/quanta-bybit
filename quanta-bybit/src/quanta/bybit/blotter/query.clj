@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [missionary.core :as m]
    [quanta.bybit.blotter.util :as u]
+   [quanta.bybit.impl.asset-converter :as ac]
    [quanta.bybit.impl.rest :as rest])
   (:import [java.math BigDecimal]
            [java.time Instant]))
@@ -47,68 +48,78 @@
       "Sell" [{:long-qty 0M :short-qty qty}]
       [{:long-qty 0M :short-qty 0M}])))
 
-(defn- coin->spot-asset [coin]
+(defn- coin->spot-asset [account coin]
   (when (and coin (not (quote-coins coin)))
-    (u/asset-from-bybit (str coin "USDT") :spot)))
+    (ac/from-api-with-category account (str coin "USDT") :spot)))
 
 (defn- with-total [items total]
   (map #(assoc % :total total) items))
 
 (defn derivative-position->item
-  "Bybit position list row -> `:broker/positions-item` (without :total)."
-  [account-id req-id category {:keys [symbol side size avgPrice markPrice positionIdx]}]
-  (when (and symbol (positive? size) (not= side "None"))
-    (let [asset (u/asset-from-bybit symbol category)]
-      (when asset
-        {:type :broker/positions-item
-         :account/id account-id
-         :req-id req-id
-         :asset asset
-         :position (position-qty side size)
-         :position-id (str symbol "-" (or positionIdx 0))
-         :settl-price (or (->decimal avgPrice) (->decimal markPrice))}))))
+  "Bybit position list row -> `:broker/positions-item` (without :total).
+   `mode` is `:main` or `:test` (from account connection settings)."
+  ([account-id req-id category row]
+   (derivative-position->item account-id req-id category :main row))
+  ([account-id req-id category mode {:keys [symbol side size avgPrice markPrice positionIdx]}]
+   (when (and symbol (positive? size) (not= side "None"))
+     (let [account {:account/settings {:connection {:mode mode}}}
+           asset (ac/from-api-with-category account symbol category)]
+       (when asset
+         {:type :broker/positions-item
+          :account/id account-id
+          :req-id req-id
+          :asset asset
+          :position (position-qty side size)
+          :position-id (str symbol "-" (or positionIdx 0))
+          :settl-price (or (->decimal avgPrice) (->decimal markPrice))})))))
 
 (defn wallet-coin->item
   "Wallet coin row -> `:broker/positions-item` (without :total)."
-  [account-id req-id {:keys [coin walletBalance]}]
-  (when-let [asset (coin->spot-asset coin)]
-    (when (positive? walletBalance)
-      {:type :broker/positions-item
-       :account/id account-id
-       :req-id req-id
-       :asset asset
-       :position [{:long-qty (->decimal walletBalance) :short-qty 0M}]
-       :position-id coin
-       :settl-price nil})))
+  ([account-id req-id coin-row]
+   (wallet-coin->item account-id req-id :main coin-row))
+  ([account-id req-id mode {:keys [coin walletBalance]}]
+   (let [account {:account/settings {:connection {:mode mode}}}]
+     (when-let [asset (coin->spot-asset account coin)]
+       (when (positive? walletBalance)
+         {:type :broker/positions-item
+          :account/id account-id
+          :req-id req-id
+          :asset asset
+          :position [{:long-qty (->decimal walletBalance) :short-qty 0M}]
+          :position-id coin
+          :settl-price nil})))))
 
 (defn open-order->status
   "Bybit open order row -> `:broker/order-status`."
-  [account-id category
-   {:keys [orderLinkId orderId symbol side qty price orderType timeInForce
-           leavesQty cumExecQty updatedTime createdTime orderStatus]}]
-  (when (and (contains? active-order-statuses orderStatus)
-             (some? orderLinkId)
-             symbol)
-    (let [asset (u/asset-from-bybit symbol category)
-          order-type (u/order-type<-bybit orderType)]
-      (when (and asset order-type)
-        (cond-> {:type :broker/order-status
-                 :account/id account-id
-                 :order-id (str orderLinkId)
-                 :asset asset
-                 :side (u/side<-bybit side)
-                 :qty (->decimal qty)
-                 :order-type order-type
-                 :date (->instant (or updatedTime createdTime))
-                 :time-in-force (time-in-force<-bybit timeInForce)
-                 :leaves-qty (->decimal leavesQty)
-                 :cum-qty (->decimal cumExecQty)
-                 :broker-order-id (str orderId)}
-          (= :limit order-type) (assoc :limit (->decimal price)))))))
+  ([account-id category row]
+   (open-order->status account-id category :main row))
+  ([account-id category mode
+    {:keys [orderLinkId orderId symbol side qty price orderType timeInForce
+            leavesQty cumExecQty updatedTime createdTime orderStatus]}]
+   (when (and (contains? active-order-statuses orderStatus)
+              (some? orderLinkId)
+              symbol)
+     (let [account {:account/settings {:connection {:mode mode}}}
+           asset (ac/from-api-with-category account symbol category)
+           order-type (u/order-type<-bybit orderType)]
+       (when (and asset order-type)
+         (cond-> {:type :broker/order-status
+                  :account/id account-id
+                  :order-id (str orderLinkId)
+                  :asset asset
+                  :side (u/side<-bybit side)
+                  :qty (->decimal qty)
+                  :order-type order-type
+                  :date (->instant (or updatedTime createdTime))
+                  :time-in-force (time-in-force<-bybit timeInForce)
+                  :leaves-qty (->decimal leavesQty)
+                  :cum-qty (->decimal cumExecQty)
+                  :broker-order-id (str orderId)}
+           (= :limit order-type) (assoc :limit (->decimal price))))))))
 
 (defn- account-context [account]
   (let [{:keys [connection login]} (:account/settings account)]
-    {:mode (or (:mode connection) :test)
+    {:mode (ac/connection-mode account)
      :login login}))
 
 (defn- safe-fetch [log label task]
@@ -130,14 +141,14 @@
        (into usdt usdc)))
     (safe-fetch log category (rest/get-positions mode login category {}))))
 
-(defn- normalize-positions [account-id req-id positions category]
+(defn- normalize-positions [account-id req-id positions category mode]
   (->> positions
-       (keep #(derivative-position->item account-id req-id category %))
+       (keep #(derivative-position->item account-id req-id category mode %))
        vec))
 
-(defn- normalize-wallet [account-id req-id wallet-result]
+(defn- normalize-wallet [account-id req-id mode wallet-result]
   (->> (get-in wallet-result [:list 0 :coin])
-       (keep #(wallet-coin->item account-id req-id %))
+       (keep #(wallet-coin->item account-id req-id mode %))
        vec))
 
 (defn open-positions-report
@@ -153,12 +164,12 @@
                       (fetch-derivative-positions mode login log :inverse)
                       (fetch-derivative-positions mode login log :option)))
          wallet-items (if (map? wallet-result)
-                        (normalize-wallet account-id req-id wallet-result)
+                        (normalize-wallet account-id req-id mode wallet-result)
                         [])
          derivative-items (vec (concat
-                                (normalize-positions account-id req-id linear :linear)
-                                (normalize-positions account-id req-id inverse :inverse)
-                                (normalize-positions account-id req-id option :option)))
+                                (normalize-positions account-id req-id linear :linear mode)
+                                (normalize-positions account-id req-id inverse :inverse mode)
+                                (normalize-positions account-id req-id option :option mode)))
          items (into wallet-items derivative-items)
          total (count items)]
      (with-total items total))))
@@ -179,10 +190,10 @@
                       (fetch-category-orders mode login log :inverse)
                       (fetch-category-orders mode login log :option)))]
      (vec (concat
-           (keep #(open-order->status account-id :spot %) spot)
-           (keep #(open-order->status account-id :linear %) linear)
-           (keep #(open-order->status account-id :inverse %) inverse)
-           (keep #(open-order->status account-id :option %) option))))))
+           (keep #(open-order->status account-id :spot mode %) spot)
+           (keep #(open-order->status account-id :linear mode %) linear)
+           (keep #(open-order->status account-id :inverse mode %) inverse)
+           (keep #(open-order->status account-id :option mode %) option))))))
 
 (defn run-query
   "Execute a trader snapshot request and return a missionary task of blotter updates."

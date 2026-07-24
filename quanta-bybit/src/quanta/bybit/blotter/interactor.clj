@@ -40,8 +40,8 @@
 
 (defn create-bybit-trade-interactor
   [req-rdv res-rdv account log]
-  (fn [_account _connection-id push pull _log _asset-converter]
-    (let [trade-message-processor (p/create-trade-messaging account nil log)]
+  (fn [_account _connection-id push pull _log asset-converter]
+    (let [trade-message-processor (p/create-trade-messaging account asset-converter log)]
       (m/sp
        (m/? (m/join vector
                     (request-loop trade-message-processor account req-rdv res-rdv push log)

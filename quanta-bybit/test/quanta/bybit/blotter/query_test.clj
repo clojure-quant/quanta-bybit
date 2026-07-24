@@ -77,6 +77,23 @@
            :orderStatus "New"
            :updatedTime "1749722400000"}))))
 
+(deftest open-order->status-testnet-test
+  (is (= "BTCUSDT.LF.BBT"
+         (:asset (q/open-order->status
+                  2000 :linear :test
+                  {:orderLinkId "bybit-demo-4"
+                   :orderId "123456"
+                   :symbol "BTCUSDT"
+                   :side "Buy"
+                   :qty "0.1"
+                   :price "50000"
+                   :orderType "Limit"
+                   :timeInForce "GTC"
+                   :leavesQty "0.1"
+                   :cumExecQty "0"
+                   :orderStatus "New"
+                   :updatedTime "1749722400000"})))))
+
 (deftest open-order-skips-filled-test
   (is (nil? (q/open-order->status
              2000 :spot

@@ -1,13 +1,18 @@
 (ns quanta.bybit.blotter.messaging-test
   (:require [clojure.test :refer [deftest is testing]]
+            [quanta.asset.mapper :as am]
             [quanta.blotter.protocol :as p]
-            [quanta.bybit.blotter.messaging]))
+            [quanta.bybit.blotter.messaging]
+            [quanta.bybit.impl.asset-converter]))
 
 (def account {:account/id 2000
-              :account/api :bybit-trade})
+              :account/api :bybit-trade
+              :account/session :bybit
+              :account/settings {:connection {:mode :main}}})
 
 (defn- messaging []
-  (p/create-trade-messaging account nil (fn [_])))
+  (let [mapper (am/create-asset-mapper account (fn [_]))]
+    (p/create-trade-messaging account mapper (fn [_]))))
 
 (def new-order
   {:type :trader/new-order

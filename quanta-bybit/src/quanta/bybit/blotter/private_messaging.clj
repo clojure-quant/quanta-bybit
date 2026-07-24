@@ -4,7 +4,8 @@
   (:require
    [clojure.string :as str]
    [tick.core :as t]
-   [quanta.bybit.blotter.util :as u])
+   [quanta.bybit.blotter.util :as u]
+   [quanta.bybit.impl.asset-converter :as ac])
   (:import [java.math BigDecimal]
            [java.time Instant]))
 
@@ -73,11 +74,12 @@
    :order-id order-id
    :date date})
 
-(defn- bybit-order->blotter [account-id {:keys [orderLinkId orderStatus rejectReason
-                                               symbol category side qty price
-                                               orderType cumExecQty avgPrice updatedTime]}]
-  (let [order-id (some-> orderLinkId str)
-        asset (u/asset-from-bybit symbol (keyword category))
+(defn- bybit-order->blotter [account {:keys [orderLinkId orderStatus rejectReason
+                                             symbol category side qty price
+                                             orderType cumExecQty avgPrice updatedTime]}]
+  (let [account-id (:account/id account)
+        order-id (some-> orderLinkId str)
+        asset (ac/from-api-with-category account symbol category)
         side-kw (u/side<-bybit side)
         order-type (u/order-type<-bybit orderType)
         qty-dec (->decimal qty)
@@ -112,14 +114,22 @@
 
         nil))))
 
-(defn read-order-update [account-id msg-in]
+(defn read-order-update
+  "Parse private order websocket payload. `account` must include `:account/id` and
+   `:account/settings :connection :mode` so assets map to `.BB` / `.BBT` correctly."
+  [account msg-in]
   (let [msg (if (and (nil? (:topic msg-in))
-                      (= order-topic (get-in msg-in [:data :topic])))
+                     (= order-topic (get-in msg-in [:data :topic])))
               (:data msg-in)
-              msg-in)]
+              msg-in)
+        ;; Back-compat: tests historically passed bare account-id.
+        account (if (map? account)
+                  account
+                  {:account/id account
+                   :account/settings {:connection {:mode :main}}})]
     (cond
       (and (= (:topic msg) order-topic) (seq (:data msg)))
-      (some #(bybit-order->blotter account-id %) (:data msg))
+      (some #(bybit-order->blotter account %) (:data msg))
 
       (and (= (:op msg) "subscribe") (false? (:success msg)))
       nil
@@ -138,4 +148,4 @@
   (unsubscribe-msg messaging subs))
 
 (defn read-order-update* [messaging msg-in]
-  (read-order-update (:account-id messaging) msg-in))
+  (read-order-update (:account messaging) msg-in))

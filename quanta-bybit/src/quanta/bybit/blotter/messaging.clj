@@ -5,6 +5,7 @@
   (:require
    [nano-id.core :refer [nano-id]]
    [tick.core :as t]
+   [quanta.asset.mapper :as am]
    [quanta.blotter.protocol :as p]
    [quanta.bybit.blotter.util :as u]))
 
@@ -17,9 +18,21 @@
     :market (when limit (throw (reject? "market orders must not include :limit")))
     (throw (reject? "order-type must be :limit or :market"))))
 
-(defn- new-order-msg [{:keys [order-id asset side qty limit order-type]}]
+(defn- asset->api
+  "Resolve Bybit symbol/category. Uses asset-mapper `to-api` so connection `:mode`
+   is checked against `.BB` / `.BBT`."
+  [asset-converter asset]
+  (let [{:keys [symbol category] :as parsed} (u/asset-category asset)]
+    (when-not parsed
+      (throw (reject? (str "unsupported bybit asset: " asset))))
+    {:symbol (if asset-converter
+               (am/to-api asset-converter asset)
+               symbol)
+     :category category}))
+
+(defn- new-order-msg [asset-converter {:keys [order-id asset side qty limit order-type]}]
   (let [_ (validate-order-type order-type limit)
-        {:keys [symbol category]} (u/asset-category asset)
+        {:keys [symbol category]} (asset->api asset-converter asset)
         bybit-order (cond-> {"symbol" symbol
                              "category" category
                              "side" (u/side->bybit side)
@@ -32,16 +45,16 @@
      :header (u/api-header)
      :args [bybit-order]}))
 
-(defn- cancel-order-msg [{:keys [order-id asset]}]
-  (let [{:keys [symbol category]} (u/asset-category asset)]
+(defn- cancel-order-msg [asset-converter {:keys [order-id asset]}]
+  (let [{:keys [symbol category]} (asset->api asset-converter asset)]
     {:op "order.cancel"
      :header (u/api-header)
      :args [{"category" category
              "symbol" symbol
              "orderLinkId" (str order-id)}]}))
 
-(defn- modify-order-msg [{:keys [order-id asset qty limit]}]
-  (let [{:keys [symbol category]} (u/asset-category asset)
+(defn- modify-order-msg [asset-converter {:keys [order-id asset qty limit]}]
+  (let [{:keys [symbol category]} (asset->api asset-converter asset)
         bybit-order (cond-> {"category" category
                              "symbol" symbol
                              "orderLinkId" (str order-id)}
@@ -51,11 +64,11 @@
      :header (u/api-header)
      :args [bybit-order]}))
 
-(defn- blotter-order->api [order]
+(defn- blotter-order->api [asset-converter order]
   (case (:type order)
-    :trader/new-order (new-order-msg order)
-    :trader/cancel-order (cancel-order-msg order)
-    :trader/modify-order (modify-order-msg order)
+    :trader/new-order (new-order-msg asset-converter order)
+    :trader/cancel-order (cancel-order-msg asset-converter order)
+    :trader/modify-order (modify-order-msg asset-converter order)
     (throw (ex-info "unsupported blotter order type"
                     {:type (:type order) :account/id (:account/id order)}))))
 
@@ -138,12 +151,11 @@
         (swap! pending-rpc dissoc id)
         pending))))
 
-(defrecord trade-messaging-bybit [account log pending-rpc]
+(defrecord trade-messaging-bybit [account asset-converter log pending-rpc]
   p/trade-messaging
-  (api-order [_ blotter-order]
+  (api-order [{:keys [asset-converter]} blotter-order]
     (let [req-id (nano-id 8)
-          msg (-> blotter-order
-                  blotter-order->api
+          msg (-> (blotter-order->api asset-converter blotter-order)
                   (assoc :reqId req-id :req_id req-id))]
       (swap! pending-rpc assoc req-id {:order blotter-order})
       msg))
@@ -157,5 +169,5 @@
           nil)))))
 
 (defmethod p/create-trade-messaging :bybit-trade
-  [account _asset-converter log]
-  (trade-messaging-bybit. account log (atom {})))
+  [account asset-converter log]
+  (trade-messaging-bybit. account asset-converter log (atom {})))
